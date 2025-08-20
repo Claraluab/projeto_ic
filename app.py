@@ -63,35 +63,63 @@ def dashboard():
 def api_dashboard(chart_type):
     try:
         conn = get_db_connection()
-        
+
+        # Mapeia a tabela e colunas por tipo de gráfico
         if chart_type == 'pld':
-            query = "SELECT date, submarket, pld FROM pld_submarket ORDER BY date"
+            base_query = "SELECT date, submarket, pld FROM pld_submarket"
         elif chart_type == 'ena':
-            query = "SELECT date, submarket, ena FROM ena_submarket ORDER BY date"
+            base_query = "SELECT date, submarket, ena FROM ena_submarket"
         elif chart_type == 'ear':
-            query = "SELECT date, submarket, ear FROM ear_submarket ORDER BY date"
+            base_query = "SELECT date, submarket, ear FROM ear_submarket"
         elif chart_type == 'cmo':
-            query = "SELECT date, submarket, cmo FROM cmo_submarket ORDER BY date"
+            base_query = "SELECT date, submarket, cmo FROM cmo_submarket"
         elif chart_type == 'geracao':
-            query = """
-            SELECT date, submarket, hydro, thermal, wind, solar 
-            FROM energy_balance 
-            ORDER BY date
+            base_query = """
+                SELECT date, submarket, hydro, thermal, wind, solar
+                FROM energy_balance
             """
         else:
             return jsonify({'error': 'Tipo de gráfico não suportado'}), 400
-        
-        df = pd.read_sql(query, conn)
+
+        # --- NOVO: filtros ---
+        conditions = []
+        params = []
+
+        start = request.args.get('start')  # 'YYYY-MM-DD'
+        end = request.args.get('end')      # 'YYYY-MM-DD'
+        subs = request.args.get('subs')    # 'NORTH,NORTHEAST,...'
+
+        if start:
+            conditions.append("date >= %s")
+            params.append(f"{start} 00:00:00")
+        if end:
+            conditions.append("date <= %s")
+            params.append(f"{end} 23:59:59")
+
+        if subs:
+            subs_list = [s.strip() for s in subs.split(',') if s.strip()]
+            if subs_list:
+                # constrói IN (%s,%s,...) seguro
+                placeholders = ",".join(["%s"] * len(subs_list))
+                conditions.append(f"submarket IN ({placeholders})")
+                params.extend(subs_list)
+
+        where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        order_clause = " ORDER BY date"
+
+        full_query = base_query + where_clause + order_clause
+
+        # usa pandas para executar com parâmetros
+        df = pd.read_sql(full_query, conn, params=params)
         conn.close()
-        
-        # Converter DataFrame para dicionário
+
         result = df.to_dict(orient='records')
-        
-        # Converter objetos Timestamp para strings
+
+        # normaliza data para string
         for item in result:
             if 'date' in item and hasattr(item['date'], 'strftime'):
                 item['date'] = item['date'].strftime('%Y-%m-%d %H:%M:%S')
-        
+
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
