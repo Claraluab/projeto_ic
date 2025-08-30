@@ -211,4 +211,4 @@ document.addEventListener('DOMContentLoaded', function () {
   // currentFilters.end   = document.getElementById('endDate').value;
 
   updateDashboard();
-});
+}); 

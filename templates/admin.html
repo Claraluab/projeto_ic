@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administração - Sistema de Monitoramento do Setor Elétrico</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .card-dashboard {
+            transition: transform 0.3s;
+        }
+        .card-dashboard:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-online {
+            background-color: #28a745;
+        }
+        .status-offline {
+            background-color: #dc3545;
+        }
+        .log-entry {
+            font-family: monospace;
+            font-size: 0.9rem;
+            border-left: 3px solid #0d6efd;
+            padding-left: 10px;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-lightning-charge"></i> Sistema de Monitoramento
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Página Inicial</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/tabelas">Tabelas</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/admin">Administração</a>
+                    </li>
+                </ul>
+                <span class="navbar-text">
+                    <i class="bi bi-person-circle"></i> Administrador
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Conteúdo Principal -->
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="display-5 mb-4"><i class="bi bi-speedometer2"></i> Painel de Administração</h1>
+            </div>
+        </div>
+
+        <!-- Cartões de Status -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card card-dashboard h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Status do Banco</h5>
+                        <div class="d-flex align-items-center">
+                            <span class="status-indicator status-online"></span>
+                            <span class="fs-4">Online</span>
+                        </div>
+                        <p class="card-text text-muted mt-2">Conexão ativa com PostgreSQL</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-dashboard h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Última Atualização</h5>
+                        <p class="fs-4">25/10/2023 14:30</p>
+                        <p class="card-text text-muted">Dados mais recentes</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-dashboard h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Tabelas</h5>
+                        <p class="fs-4">18</p>
+                        <p class="card-text text-muted">Tabelas no banco de dados</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-dashboard h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Registros</h5>
+                        <p class="fs-4">2.5M</p>
+                        <p class="card-text text-muted">Total de registros armazenados</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ações de Administração -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0"><i class="bi bi-gear"></i> Ações do Sistema</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="d-grid gap-2">
+                                    <button id="update-data-btn" class="btn btn-primary btn-lg">
+                                        <i class="bi bi-cloud-arrow-down"></i> Atualizar Dados
+                                    </button>
+                                    <div class="form-text">
+                                        Busca os dados mais recentes das fontes externas
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="d-grid gap-2">
+                                    <button id="init-db-btn" class="btn btn-outline-danger btn-lg">
+                                        <i class="bi bi-database"></i> Inicializar Banco de Dados
+                                    </button>
+                                    <div class="form-text text-danger">
+                                        Atenção: Esta ação recria toda a estrutura do banco
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs do Sistema -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0"><i class="bi bi-list-check"></i> Logs do Sistema</h5>
+                        <button class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise"></i> Atualizar
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="log-entries" style="max-height: 300px; overflow-y: auto;">
+                            <div class="log-entry">
+                                <span class="text-muted">[25/10/2023 14:30:12]</span> 
+                                <span class="text-success">Atualização concluída com sucesso. 1250 novos registros.</span>
+                            </div>
+                            <div class="log-entry">
+                                <span class="text-muted">[25/10/2023 14:28:05]</span> 
+                                <span class="text-info">Iniciando processo de atualização de dados...</span>
+                            </div>
+                            <div class="log-entry">
+                                <span class="text-muted">[25/10/2023 12:15:44]</span> 
+                                <span class="text-primary">Usuário administrador fez login no sistema.</span>
+                            </div>
+                            <div class="log-entry">
+                                <span class="text-muted">[25/10/2023 10:05:22]</span> 
+                                <span class="text-success">Backup automático realizado com sucesso.</span>
+                            </div>
+                            <div class="log-entry">
+                                <span class="text-muted">[25/10/2023 09:30:15]</span> 
+                                <span class="text-info">Sistema iniciado. Todos os serviços estão online.</span>
+                            </div>
+                            <div class="log-entry">
+                                <span class="text-muted">[24/10/2023 23:45:18]</span> 
+                                <span class="text-warning">Manutenção programada iniciada.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-light text-center mt-5 py-4">
+        <div class="container">
+            <p class="text-muted mb-0">Sistema de Monitoramento de Dados do Setor Elétrico Brasileiro © 2023</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap & JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>
