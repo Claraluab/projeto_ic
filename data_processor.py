@@ -260,4 +260,4 @@ if __name__ == "__main__":
     print("\nProcessando dados da CCEE...")
     update_ccee_data()
     
-    print("\nProcessamento completo concluído!")
+    print("\nProcessamento completo concluído!") 

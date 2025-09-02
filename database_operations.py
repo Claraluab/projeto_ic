@@ -18,24 +18,56 @@ def get_table_names():
     conn.close()
     return tables
 
-def get_table_data(table_name, limit=100, offset=0):
-    """Retorna dados de uma tabela com paginação"""
+def get_table_data(table_name, limit, offset, start_date=None, end_date=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM {table_name} ORDER BY date DESC LIMIT %s OFFSET %s", (limit, offset))
-    columns = [desc[0] for desc in cursor.description]
+    
+    query = f"SELECT * FROM {table_name}"
+    conditions = []
+    params = {}
+    
+    if start_date:
+        conditions.append("date >= %(start_date)s")
+        params['start_date'] = start_date
+    if end_date:
+        conditions.append("date <= %(end_date)s")
+        params['end_date'] = end_date
+    
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    
+    query += " LIMIT %(limit)s OFFSET %(offset)s"
+    params['limit'] = limit
+    params['offset'] = offset
+    
+    cursor.execute(query, params)
     data = cursor.fetchall()
+    columns = [desc[0] for desc in cursor.description]
     conn.close()
     return columns, data
 
-def get_table_row_count(table_name):
-    """Retorna o número total de linhas em uma tabela"""
+def get_table_row_count(table_name, start_date=None, end_date=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+    
+    query = f"SELECT COUNT(*) FROM {table_name}"
+    conditions = []
+    params = {}
+    
+    if start_date:
+        conditions.append("date >= %(start_date)s")
+        params['start_date'] = start_date
+    if end_date:
+        conditions.append("date <= %(end_date)s")
+        params['end_date'] = end_date
+    
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    
+    cursor.execute(query, params)
     count = cursor.fetchone()[0]
     conn.close()
-    return count
+    return count 
 
 def create_tables():
     """Cria tabelas no PostgreSQL se não existirem"""

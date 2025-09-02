@@ -1,5 +1,3 @@
-// static/js/table.js
-
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Página de tabela carregada');
     
@@ -9,7 +7,9 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const format = this.dataset.format;
             const tableName = this.dataset.table;
-            exportTableData(tableName, format);
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            exportTableData(tableName, format, startDate, endDate);
         });
     });
     
@@ -18,13 +18,53 @@ document.addEventListener('DOMContentLoaded', function() {
     if (searchInput) {
         searchInput.addEventListener('keyup', filterTable);
     }
+    
+    // Adicionar funcionalidade ao filtro de data
+    const applyDateFilter = document.getElementById('apply-date-filter');
+    if (applyDateFilter) {
+        applyDateFilter.addEventListener('click', applyDateFilterToTable);
+    }
+    
+    // Adicionar funcionalidade ao botão de limpar filtro
+    const clearDateFilter = document.getElementById('clear-date-filter');
+    if (clearDateFilter) {
+        clearDateFilter.addEventListener('click', clearDateFilterFromTable);
+    }
+    
+    // Verificar se há parâmetros de data na URL e preencher os campos
+    const urlParams = new URLSearchParams(window.location.search);
+    const startDateParam = urlParams.get('start_date');
+    const endDateParam = urlParams.get('end_date');
+    
+    if (startDateParam) {
+        document.getElementById('start-date').value = startDateParam;
+    }
+    
+    if (endDateParam) {
+        document.getElementById('end-date').value = endDateParam;
+    }
 });
 
-function exportTableData(tableName, format) {
-    console.log(`Exportando tabela ${tableName} no formato ${format}`);
+function exportTableData(tableName, format, startDate, endDate) {
+    console.log(`Exportando tabela ${tableName} no formato ${format} de ${startDate} até ${endDate}`);
     
     if (format === 'csv') {
-        window.location.href = `/export/${tableName}`;
+        let url = `/export/${tableName}`;
+        const params = [];
+        
+        if (startDate) {
+            params.push(`start_date=${encodeURIComponent(startDate)}`);
+        }
+        
+        if (endDate) {
+            params.push(`end_date=${encodeURIComponent(endDate)}`);
+        }
+        
+        if (params.length > 0) {
+            url += `?${params.join('&')}`;
+        }
+        
+        window.location.href = url;
     } else {
         showAlert(`Exportação no formato ${format.toUpperCase()} em desenvolvimento`, 'info');
     }
@@ -59,6 +99,60 @@ function filterTable() {
     }
 }
 
+function applyDateFilterToTable() {
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    
+    // Obter o nome da tabela da URL atual
+    const pathParts = window.location.pathname.split('/');
+    const tableName = pathParts[pathParts.length - 1];
+    
+    // Construir a URL com os parâmetros de filtro
+    let url = `/tabelas/${tableName}?`;
+    const params = [];
+    
+    if (startDate) {
+        params.push(`start_date=${encodeURIComponent(startDate)}`);
+    }
+    
+    if (endDate) {
+        params.push(`end_date=${encodeURIComponent(endDate)}`);
+    }
+    
+    // Manter o parâmetro de página se existir
+    const urlParams = new URLSearchParams(window.location.search);
+    const page = urlParams.get('page');
+    
+    if (page) {
+        params.push(`page=${page}`);
+    }
+    
+    if (params.length > 0) {
+        url += params.join('&');
+    }
+    
+    window.location.href = url;
+}
+
+function clearDateFilterFromTable() {
+    // Obter o nome da tabela da URL atual
+    const pathParts = window.location.pathname.split('/');
+    const tableName = pathParts[pathParts.length - 1];
+    
+    // Manter o parâmetro de página se existir
+    const urlParams = new URLSearchParams(window.location.search);
+    const page = urlParams.get('page');
+    
+    let url = `/tabelas/${tableName}`;
+    
+    if (page) {
+        url += `?page=${page}`;
+    }
+    
+    window.location.href = url;
+}
+
+
 function showAlert(message, type = 'info') {
     // Remover alertas existentes
     const existingAlerts = document.querySelectorAll('.alert-dismissible');
@@ -84,4 +178,4 @@ function showAlert(message, type = 'info') {
             bsAlert.close();
         }
     }, 5000);
-}
+} 

@@ -1,10 +1,10 @@
-# app.py
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response
 import pandas as pd
 import io
-import json
+import csv
 from datetime import datetime
 from threading import Thread
+from sqlalchemy import text
 
 from database_operations import get_db_connection, get_table_names, get_table_data, get_table_row_count
 from data_processor import initialize_database, update_ons_data, update_ccee_data
@@ -17,43 +17,160 @@ app.config.from_pyfile('config.py')
 def index():
     return render_template('index.html')
 
-#  Tela 2 – Listagem de Tabelas
+# Tela 2 – Listagem de Tabelas
 @app.route('/tabelas')
 def list_tables():
     try:
         table_names = get_table_names()
         return render_template('tables.html', tables=table_names)
     except Exception as e:
-        return render_template('error.html', error=f"Erro ao acessar o banco de dados: {str(e)}")
+        return render_template('error.html', error=f"Erro ao acessar o banco de dados: {str(e)}") 
 
-# Tela 3 – Visualização de Dados da Tabela
+# Tela 3 – Visualização de Dados de Tabela
 @app.route('/tabelas/<table_name>')
 def table_data(table_name):
     try:
+        # Obter parâmetros de paginação e filtro
         page = request.args.get('page', 1, type=int)
-        per_page = 50
-        
-        # Obter total de registros
-        total = get_table_row_count(table_name)
-        
-        # Calcular número total de páginas
-        total_pages = (total + per_page - 1) // per_page
-        
-        # Obter dados paginados
-        columns, data = get_table_data(table_name, per_page, (page - 1) * per_page)
-        
-        return render_template('table_data.html', 
-                             table_name=table_name,
-                             columns=columns,
-                             data=data,
-                             page=page,
-                             per_page=per_page,
-                             total=total,
-                             total_pages=total_pages)
-    except Exception as e:
-        return render_template('error.html', error=f"Erro ao acessar dados da tabela: {str(e)}")
+        per_page = 100  # Itens por página
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
 
-#  Tela 4 – Dashboard Interativo
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Descobrir colunas
+        cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+        columns = [desc[0] for desc in cursor.description]
+
+        # Construir consulta base
+        query = f"SELECT * FROM {table_name}"
+        count_query = f"SELECT COUNT(*) FROM {table_name}"
+        conditions = []
+        params = []
+
+        # Adicionar filtros de data se fornecidos
+        date_column = None
+        for col in columns:
+            if col.lower() in ['date', 'data', 'timestamp', 'datetime']:
+                date_column = col
+                break
+
+        if date_column:
+            if start_date:
+                conditions.append(f"{date_column} >= %s")
+                params.append(start_date)
+            if end_date:
+                conditions.append(f"{date_column} <= %s")
+                params.append(end_date)
+
+        if conditions:
+            where_clause = " WHERE " + " AND ".join(conditions)
+            query += where_clause
+            count_query += where_clause
+
+        # Adicionar paginação
+        query += f" LIMIT {per_page} OFFSET {(page - 1) * per_page}"
+
+        # Executar consultas
+        cursor.execute(query, params)
+        data = cursor.fetchall()
+
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()[0]
+        total_pages = (total_count + per_page - 1) // per_page
+
+        conn.close()
+
+        return render_template(
+            'table_data.html',
+            table_name=table_name,
+            columns=columns,
+            data=data,
+            page=page,
+            total_pages=total_pages,
+            start_date=start_date,
+            end_date=end_date
+        )
+    except Exception as e:
+        return render_template('error.html', error=f"Erro ao acessar tabela: {str(e)}")
+
+# Exportar dados para CSV
+@app.route('/export/<table_name>')
+def export_csv(table_name):
+    try:
+        # Obter parâmetros de data
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Primeiro, descubra o nome da coluna de data
+        cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+        columns = [desc[0] for desc in cursor.description]
+        
+        # Encontrar a coluna de data
+        date_column = None
+        for col in columns:
+            if col.lower() in ['date', 'data', 'timestamp', 'datetime']:
+                date_column = col
+                break
+        
+        # Construir consulta com filtros de data se fornecidos
+        query = f"SELECT * FROM {table_name}"
+        conditions = []
+        params = []
+        
+        if date_column:
+            if start_date:
+                conditions.append(f"{date_column} >= %s")
+                params.append(start_date)
+            if end_date:
+                conditions.append(f"{date_column} <= %s")
+                params.append(end_date)
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        # Executar a consulta e obter os dados
+        cursor.execute(query, params)
+        data = cursor.fetchall()
+        
+        conn.close()
+        
+        # Criar arquivo CSV em memória
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Escrever cabeçalho
+        writer.writerow(columns)
+        
+        # Escrever dados
+        for row in data:
+            writer.writerow(row)
+        
+        output.seek(0)
+        
+        # Criar nome do arquivo com as datas se existirem
+        if start_date and end_date:
+            filename = f'{table_name}_{start_date}_{end_date}.csv'
+        elif start_date:
+            filename = f'{table_name}_{start_date}_to_now.csv'
+        elif end_date:
+            filename = f'{table_name}_until_{end_date}.csv'
+        else:
+            filename = f'{table_name}_all.csv'
+        
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment;filename={filename}"}
+        )
+    except Exception as e:
+        return render_template('error.html', error=f"Erro ao exportar dados: {str(e)}")
+    
+# Tela 4 – Dashboard Interativo
 @app.route('/dashboard')
 def dashboard():
     return render_template('dashboard.html')
@@ -81,7 +198,7 @@ def api_dashboard(chart_type):
         else:
             return jsonify({'error': 'Tipo de gráfico não suportado'}), 400
 
-        # --- NOVO: filtros ---
+        # Filtros
         conditions = []
         params = []
 
@@ -153,26 +270,6 @@ def admin():
     except Exception as e:
         return render_template('error.html', error=f"Erro ao acessar painel administrativo: {str(e)}")
 
-# Exportar CSV
-@app.route('/export/<table_name>')
-def export_csv(table_name):
-    try:
-        conn = get_db_connection()
-        df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
-        conn.close()
-        
-        output = io.BytesIO()
-        df.to_csv(output, index=False, encoding='utf-8')
-        output.seek(0)
-        
-        return send_file(
-            output,
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name=f'{table_name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-        )
-    except Exception as e:
-        return render_template('error.html', error=f"Erro ao exportar dados: {str(e)}")
 
 # Inicialização do banco
 @app.route('/init-db')
